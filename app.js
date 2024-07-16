@@ -61,6 +61,22 @@ const Movie = sequelize.define('Movie', {
     }
 });
 
+const Rating = sequelize.define('Rating', {
+    score: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        validate: {
+            min: 1,
+            max: 10
+        }
+    }
+});
+
+User.hasMany(Rating);
+Rating.belongsTo(User);
+Movie.hasMany(Rating);
+Rating.belongsTo(Movie);
+
 const initializeDatabase = async () => {
     await sequelize.sync({ alter: true });
 };
@@ -165,6 +181,76 @@ app.get('/movies', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+app.post('/movies/:id/rate', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const movieId = req.params.id;
+    const { score } = req.body;
+
+    if (!score || score < 1 || score > 10) {
+        return res.status(400).json({ error: 'Score must be between 1 and 10' });
+    }
+
+    try {
+        const movie = await Movie.findByPk(movieId);
+        if (!movie) {
+            return res.status(404).json({ error: 'Movie not found' });
+        }
+
+        const user = req.user;
+        const existingRating = await Rating.findOne({ where: { UserId: user.id, MovieId: movie.id } });
+
+        if (existingRating) {
+            existingRating.score = score;
+            await existingRating.save();
+        } else {
+            await Rating.create({ score, UserId: user.id, MovieId: movie.id });
+        }
+
+        res.json({ message: 'Rating submitted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/movies/:id/ratings', async (req, res) => {
+    const movieId = req.params.id;
+
+    try {
+        const movie = await Movie.findByPk(movieId, {
+            include: {
+                model: Rating,
+                include: [
+                    {
+                        model: User,
+                        attributes: ['username']
+                    },
+                    {
+                        model: Movie,
+                        attributes: ['name']
+                    }
+                ]
+            }
+        });
+
+        if (!movie) {
+            return res.status(404).json({ error: 'Movie not found' });
+        }
+
+        res.json(movie.Ratings.map(rating => ({
+            id: rating.id,
+            score: rating.score,
+            createdAt: rating.createdAt,
+            updatedAt: rating.updatedAt,
+            UserId: rating.UserId,
+            MovieId: rating.MovieId,
+            User: rating.User,
+            Movie: { name: movie.name }
+        })));
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server running on port ${port}`));
