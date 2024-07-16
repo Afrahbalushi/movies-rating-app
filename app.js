@@ -78,8 +78,24 @@ Movie.hasMany(Rating);
 Rating.belongsTo(Movie);
 
 const initializeDatabase = async () => {
-    await sequelize.sync({ alter: true });
+    try {
+        const usersExist = await User.sync();
+        const moviesExist = await Movie.sync();
+        const ratingsExist = await Rating.sync();
+
+        if (usersExist && moviesExist && ratingsExist) {
+            console.log('Database tables already exist.');
+            return;
+        }
+
+        await sequelize.sync({ alter: true });
+        console.log('Database synchronized successfully.');
+    } catch (error) {
+        console.error('Error initializing database:', error.message);
+        
+    }
 };
+
 
 const jwtOptions = {
     jwtFromRequest: passportJWT.ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -147,7 +163,16 @@ const parseDate = (dateString) => {
 
 async function loadMovies() {
     try {
+        
+        const existingMoviesCount = await Movie.count();
+        
+        if (existingMoviesCount > 0) {
+            console.log('Movies already loaded. Skipping insertion.');
+            return;
+        }
+
         const movies = require('./movies.json');
+
         const movieRecords = await Promise.all(movies.map(async (movie) => {
             try {
                 const details = await fetchMovieDetails(movie.id);
@@ -163,12 +188,20 @@ async function loadMovies() {
                 return null;
             }
         }));
-        await Movie.bulkCreate(movieRecords.filter(record => record));
-        console.log('Movies loaded successfully');
+        
+        const validMovieRecords = movieRecords.filter(record => record);
+
+        if (validMovieRecords.length > 0) {
+            await Movie.bulkCreate(validMovieRecords);
+            console.log('Movies loaded successfully');
+        } else {
+            console.log('No valid movies to load.');
+        }
     } catch (error) {
         console.error('Error loading movies:', error.message);
     }
 }
+
 
 initializeDatabase().then(loadMovies);
 
@@ -250,6 +283,64 @@ app.get('/movies/:id/ratings', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+
+// Function to truncate description while preserving full words
+const truncateDescription = (description, maxLength) => {
+    if (!description) return '';
+
+    // Check if description exceeds maxLength
+    if (description.length > maxLength) {
+        // Trim to the maximum length
+        let truncatedText = description.substring(0, maxLength);
+
+        // Re-trim to the last complete word
+        truncatedText = truncatedText.substr(0, Math.min(truncatedText.length, truncatedText.lastIndexOf(' ')));
+
+        return truncatedText.trim() + '...';
+    }
+
+    return description;
+};
+
+app.get('/movies/list', async (req, res) => {
+    try {
+        const movies = await Movie.findAll({
+            attributes: [
+                'id',
+                'name',
+                'description',
+                [sequelize.fn('AVG', sequelize.col('Ratings.score')), 'averageRating']
+            ],
+            include: [{
+                model: Rating,
+                attributes: []
+            }],
+            group: ['Movie.id', 'name', 'description']
+        });
+
+        const formattedMovies = movies.map(movie => {
+            const averageRating = parseFloat(movie.dataValues.averageRating || 0);
+            const description = truncateDescription(movie.description, 100);
+
+            return {
+                id: movie.id,
+                name: movie.name,
+                description: description,
+                averageRating: averageRating
+            };
+        });
+
+        res.json(formattedMovies);
+    } catch (error) {
+        console.error('Error fetching movie list:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
+
 
 
 const port = process.env.PORT || 3000;
