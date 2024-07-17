@@ -7,6 +7,9 @@ const passportJWT = require('passport-jwt');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const moment = require('moment');
+const { Op } = require('sequelize');
+const numeral = require('numeral');
+
 
 const app = express();
 app.use(bodyParser.json());
@@ -285,16 +288,12 @@ app.get('/movies/:id/ratings', async (req, res) => {
 });
 
 
-// Function to truncate description while preserving full words
+
 const truncateDescription = (description, maxLength) => {
     if (!description) return '';
 
-    // Check if description exceeds maxLength
     if (description.length > maxLength) {
-        // Trim to the maximum length
         let truncatedText = description.substring(0, maxLength);
-
-        // Re-trim to the last complete word
         truncatedText = truncatedText.substr(0, Math.min(truncatedText.length, truncatedText.lastIndexOf(' ')));
 
         return truncatedText.trim() + '...';
@@ -340,6 +339,30 @@ app.get('/movies/list', async (req, res) => {
 
 
 
+app.get('/movies/search', async (req, res) => {
+    const { query } = req.query;
+
+    if (!query) {
+        return res.status(400).json({ error: 'Query parameter is required' });
+    }
+
+    try {
+        const movies = await Movie.findAll({
+            where: {
+                [Op.or]: [
+                    { name: { [Op.like]: `%${query}%` } },
+                    { description: { [Op.like]: `%${query}%` } }
+                ]
+            },
+            attributes: ['id', 'name', 'description']
+        });
+
+        res.json(movies);
+    } catch (error) {
+        console.error('Error searching for movies:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 
 
