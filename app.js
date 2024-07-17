@@ -365,6 +365,36 @@ app.get('/movies/search', async (req, res) => {
 });
 
 
+app.get('/movies/top-rated', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const topRatedMovies = await Rating.findAll({
+            where: { UserId: userId },
+            attributes: ['MovieId', [sequelize.col('Movie.name'), 'name'], 'score'],
+            include: [{
+                model: Movie,
+                attributes: []
+            }],
+            order: [['score', 'DESC']],
+            limit: 5
+        });
+
+        const formattedMovies = topRatedMovies.map(rating => ({
+            id: rating.MovieId,
+            name: rating.getDataValue('name'),
+            rating: rating.score
+        }));
+
+        res.json(formattedMovies);
+    } catch (error) {
+        console.error('Error fetching top-rated movies:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server running on port ${port}`));
