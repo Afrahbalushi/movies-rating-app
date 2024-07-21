@@ -8,12 +8,35 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const moment = require('moment');
 const { Op } = require('sequelize');
-const numeral = require('numeral');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const mime = require('mime-types');
+
+
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
 
 
 const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+
 
 const sequelize = new Sequelize('moviesDB', 'sa', 'root', {
     host: 'localhost',
@@ -80,24 +103,48 @@ Rating.belongsTo(User);
 Movie.hasMany(Rating);
 Rating.belongsTo(Movie);
 
+
+
+const Memory = sequelize.define('Memory', {
+    title: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    date: {
+        type: DataTypes.DATE,
+        allowNull: false
+    },
+    photos: {
+        type: DataTypes.STRING,
+        allowNull: true 
+    },
+    story: {
+        type: DataTypes.TEXT,
+        allowNull: false
+    }
+});
+
+User.hasMany(Memory);
+Memory.belongsTo(User);
+Movie.hasMany(Memory);
+Memory.belongsTo(Movie);
+
+
+
+
+
 const initializeDatabase = async () => {
     try {
-        const usersExist = await User.sync();
-        const moviesExist = await Movie.sync();
-        const ratingsExist = await Rating.sync();
-
-        if (usersExist && moviesExist && ratingsExist) {
-            console.log('Database tables already exist.');
-            return;
-        }
-
-        await sequelize.sync({ alter: true });
+        await User.sync();
+        await Movie.sync();
+        await Rating.sync();
+        await Memory.sync();
         console.log('Database synchronized successfully.');
     } catch (error) {
         console.error('Error initializing database:', error.message);
-        
     }
 };
+
 
 
 const jwtOptions = {
@@ -393,6 +440,95 @@ app.get('/movies/top-rated', passport.authenticate('jwt', { session: false }), a
     }
 });
 
+
+
+const downloadImage = async (url, filePath) => {
+    const writer = fs.createWriteStream(filePath);
+    const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream'
+    });
+    response.data.pipe(writer);
+    return new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+    });
+};
+
+
+app.post('/movies/:id/memories', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const movieId = req.params.id;
+    const { title, date, story, photoUrl } = req.body;
+
+    if (!title || !date || !story || !photoUrl) {
+        return res.status(400).json({ error: 'Title, date, story, and photoUrl are required' });
+    }
+
+    const url = new URL(photoUrl);
+    let ext = path.extname(url.pathname).toLowerCase();
+
+    
+    if (!['.jpg', '.jpeg', '.png'].includes(ext)) {
+        ext = '.jpg';
+    }
+
+    const fileName = Date.now() + ext;
+    const filePath = path.join(__dirname, 'uploads', fileName);
+
+    try {
+        
+        await downloadImage(photoUrl, filePath);
+
+        const movie = await Movie.findByPk(movieId);
+        if (!movie) {
+            return res.status(404).json({ error: 'Movie not found' });
+        }
+
+        const memory = await Memory.create({
+            title,
+            date: new Date(date),
+            photos: fileName, 
+            story,
+            UserId: req.user.id,
+            MovieId: movie.id
+        });
+
+        res.json({ message: 'Memory added successfully!', memory });
+    } catch (error) {
+        console.error('Error creating memory:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
+app.get('/memories', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const memories = await Memory.findAll({
+            where: { UserId: userId },
+            include: {
+                model: Movie,
+                attributes: ['id', 'name']
+            },
+            attributes: ['id', 'title', 'MovieId']
+        });
+
+        const response = memories.map(memory => ({
+            id: memory.id,
+            movieId: memory.MovieId,
+            movieName: memory.Movie.name,
+            title: memory.title
+        }));
+
+        res.json(response);
+    } catch (error) {
+        console.error('Error fetching memories:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 
 
