@@ -130,9 +130,6 @@ Movie.hasMany(Memory);
 Memory.belongsTo(Movie);
 
 
-
-
-
 const initializeDatabase = async () => {
     try {
         await User.sync();
@@ -526,6 +523,33 @@ app.get('/memories', passport.authenticate('jwt', { session: false }), async (re
         res.json(response);
     } catch (error) {
         console.error('Error fetching memories:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+app.put('/memories/:id', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const memoryId = req.params.id;
+    const { title, story } = req.body;
+
+    if (!title && !story) {
+        return res.status(400).json({ error: 'At least one of title or story must be provided to update' });
+    }
+
+    try {
+        const memory = await Memory.findOne({ where: { id: memoryId, UserId: req.user.id } });
+        if (!memory) {
+            return res.status(404).json({ error: 'Memory not found or you do not have permission to update it' });
+        }
+
+        if (title) memory.title = title;
+        if (story) memory.story = story;
+
+        await memory.save();
+
+        res.json({ message: 'Memory updated successfully', memory });
+    } catch (error) {
+        console.error('Error updating memory:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
