@@ -556,5 +556,74 @@ app.put('/memories/:id', passport.authenticate('jwt', { session: false }), async
 
 
 
+app.post('/memories/:id/photos', passport.authenticate('jwt', { session: false }), upload.array('photos', 10), async (req, res) => {
+    const memoryId = req.params.id;
+
+    try {
+        const memory = await Memory.findOne({ where: { id: memoryId, UserId: req.user.id } });
+        if (!memory) {
+            return res.status(404).json({ error: 'Memory not found or you do not have permission to update it' });
+        }
+
+       
+        const newPhotos = req.files.map(file => file.filename);
+        const existingPhotos = memory.photos ? memory.photos.split(',') : [];
+        const updatedPhotos = existingPhotos.concat(newPhotos).join(',');
+
+        memory.photos = updatedPhotos;
+        await memory.save();
+
+        res.json({ message: 'Photos added successfully', memory });
+    } catch (error) {
+        console.error('Error adding photos to memory:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+app.delete('/memories/:id/photos', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const memoryId = req.params.id;
+    const { photosToDelete } = req.body;
+
+    if (!photosToDelete || !Array.isArray(photosToDelete)) {
+        return res.status(400).json({ error: 'photosToDelete must be provided as an array of filenames' });
+    }
+
+    try {
+        const memory = await Memory.findOne({ where: { id: memoryId, UserId: req.user.id } });
+        if (!memory) {
+            return res.status(404).json({ error: 'Memory not found or you do not have permission to update it' });
+        }
+
+        const existingPhotos = memory.photos ? memory.photos.split(',') : [];
+        const updatedPhotos = existingPhotos.filter(photo => !photosToDelete.includes(photo));
+
+        memory.photos = updatedPhotos.join(',');
+
+        
+        photosToDelete.forEach(photo => {
+            const filePath = path.join(uploadDir, photo);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        });
+
+        await memory.save();
+
+        res.json({ message: 'Photos deleted successfully', memory });
+    } catch (error) {
+        console.error('Error deleting photos from memory:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
+
+
+
+
+
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server running on port ${port}`));
