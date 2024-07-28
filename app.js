@@ -686,5 +686,27 @@ app.get('/top-words', passport.authenticate('jwt', { session: false }), async (r
 
 
 
+app.get('/memories/:id/urls', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const memoryId = req.params.id;
+
+    try {
+        const memory = await Memory.findByPk(memoryId);
+
+        if (!memory) {
+            return res.status(404).json({ error: 'Memory not found' });
+        }
+
+        const urlRegex = /https?:\/\/[^\s]+/g;
+        const urls = memory.story.match(urlRegex) || [];
+
+        res.json({ urls });
+    } catch (error) {
+        console.error('Error extracting URLs:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server running on port ${port}`));
