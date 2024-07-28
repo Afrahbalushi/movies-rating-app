@@ -708,5 +708,36 @@ app.get('/memories/:id/urls', passport.authenticate('jwt', { session: false }), 
 
 
 
+const isUnscrambledName = (movieName, scrambled) => {
+    const normalize = str => str.toLowerCase().replace(/\s/g, '').split('').sort().join('');
+    return normalize(movieName) === normalize(scrambled);
+};
+
+app.get('/movies/unscramble', async (req, res) => {
+    const { scrambled } = req.query;
+
+    if (!scrambled) {
+        return res.status(400).json({ error: 'Scrambled name is required' });
+    }
+
+    try {
+        const movies = await Movie.findAll({ attributes: ['id', 'name', 'description'] });
+        const unscrambledMovies = movies.filter(movie => isUnscrambledName(movie.name, scrambled));
+
+        if (unscrambledMovies.length > 0) {
+            res.json(unscrambledMovies);
+        } else {
+            res.status(404).json({ error: 'Movie not found' });
+        }
+    } catch (error) {
+        console.error('Error unscrambling movie name:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
+
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server running on port ${port}`));
