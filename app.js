@@ -11,7 +11,7 @@ const { Op } = require('sequelize');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const mime = require('mime-types');
+
 
 
 const uploadDir = path.join(__dirname, 'uploads');
@@ -619,6 +619,33 @@ app.delete('/memories/:id/photos', passport.authenticate('jwt', { session: false
 
 
 
+app.delete('/memories/:id', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const memoryId = req.params.id;
+
+    try {
+        const memory = await Memory.findOne({ where: { id: memoryId, UserId: req.user.id } });
+
+        if (!memory) {
+            return res.status(404).json({ error: 'Memory not found or you do not have permission to delete it' });
+        }
+
+        if (memory.photos) {
+            const photos = memory.photos.split(',');
+            photos.forEach(photo => {
+                const filePath = path.join(uploadDir, photo);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+        }
+
+        await memory.destroy();
+        res.json({ message: 'Memory deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting memory:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 
 
