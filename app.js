@@ -648,7 +648,41 @@ app.delete('/memories/:id', passport.authenticate('jwt', { session: false }), as
 });
 
 
+const stopWords = new Set([
+    'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves',
+    'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their',
+    'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was',
+    'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and',
+    'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between',
+    'into', 'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off',
+    'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any',
+    'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
+    'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now'
+]);
 
+app.get('/top-words', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    try {
+        const memories = await Memory.findAll({ attributes: ['story'] });
+        const wordCounts = {};
+
+        memories.forEach(memory => {
+            const words = memory.story.toLowerCase().split(/\W+/);
+            words.forEach(word => {
+                if (!stopWords.has(word) && word.length > 0) {
+                    wordCounts[word] = (wordCounts[word] || 0) + 1;
+                }
+            });
+        });
+
+        const sortedWords = Object.entries(wordCounts).sort((a, b) => b[1] - a[1]);
+        const topWords = sortedWords.slice(0, 5).map(entry => ({ word: entry[0], count: entry[1] }));
+
+        res.json(topWords);
+    } catch (error) {
+        console.error('Error fetching top words:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 
 
