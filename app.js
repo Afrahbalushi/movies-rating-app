@@ -599,17 +599,14 @@ app.get('/memories/:id', async (req, res) => {
     const memoryId = parseInt(req.params.id, 10);
 
     try {
-        
         const memory = await Memory.findByPk(memoryId);
 
         if (!memory) {
             return res.status(404).json({ error: 'Memory not found' });
         }
 
-        
         const photoFilenames = memory.photos ? memory.photos.split(',') : [];
 
-        
         const photoDetails = photoFilenames.map(photoFilename => {
             const trimmedFilename = photoFilename.trim();
             const photoPath = path.join(uploadDir, trimmedFilename);
@@ -625,8 +622,8 @@ app.get('/memories/:id', async (req, res) => {
 
                 const stats = fs.statSync(photoPath);
                 const photoName = path.basename(trimmedFilename, path.extname(trimmedFilename));
-                const photoExtension = path.extname(trimmedFilename).substring(1).toUpperCase(); // Extension without '.'
-                const photoSize = (stats.size / 1024).toFixed(2) + 'KB'; // Size in KB
+                const photoExtension = path.extname(trimmedFilename).substring(1).toUpperCase(); 
+                const photoSize = (stats.size / 1024).toFixed(2) + 'KB'; 
                 const photoTimeCreated = stats.birthtime;
 
                 return {
@@ -656,9 +653,6 @@ app.get('/memories/:id', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
-
-
-
 
 
 
