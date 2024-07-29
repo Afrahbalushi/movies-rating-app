@@ -598,7 +598,40 @@ app.get('/memories', passport.authenticate('jwt', { session: false }), async (re
 
 
 
+
+
 //12
+app.get('/memories/:id/photo', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const memoryId = req.params.id;
+
+    try {
+        const memory = await Memory.findByPk(memoryId);
+
+        if (!memory) {
+            return res.status(404).json({ error: 'Memory not found' });
+        }
+
+        const photoFilename = memory.photos; 
+
+        if (!photoFilename) {
+            return res.status(404).json({ error: 'No photo associated with this memory' });
+        }
+
+        const filePath = path.join(__dirname, 'uploads', photoFilename);
+
+        console.log(`Looking for file at: ${filePath}`); 
+
+        if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+        } else {
+            res.status(404).json({ error: 'Photo file not found' });
+        }
+    } catch (error) {
+        console.error('Error fetching photo:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 
 
 
