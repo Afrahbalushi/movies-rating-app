@@ -606,10 +606,10 @@ app.get('/memories/:id', async (req, res) => {
             return res.status(404).json({ error: 'Memory not found' });
         }
 
-       
+        
         const photoFilenames = memory.photos ? memory.photos.split(',') : [];
 
-       
+        
         const photoDetails = photoFilenames.map(photoFilename => {
             const trimmedFilename = photoFilename.trim();
             const photoPath = path.join(uploadDir, trimmedFilename);
@@ -617,7 +617,7 @@ app.get('/memories/:id', async (req, res) => {
             console.log(`Attempting to read photo file: ${photoPath}`); 
 
             try {
-               
+                
                 if (!fs.existsSync(photoPath)) {
                     console.error(`File does not exist: ${photoPath}`);
                     return null;
@@ -625,8 +625,8 @@ app.get('/memories/:id', async (req, res) => {
 
                 const stats = fs.statSync(photoPath);
                 const photoName = path.basename(trimmedFilename, path.extname(trimmedFilename));
-                const photoExtension = path.extname(trimmedFilename).substring(1).toUpperCase(); 
-                const photoSize = (stats.size / 1024).toFixed(2) + 'KB'; 
+                const photoExtension = path.extname(trimmedFilename).substring(1).toUpperCase(); // Extension without '.'
+                const photoSize = (stats.size / 1024).toFixed(2) + 'KB'; // Size in KB
                 const photoTimeCreated = stats.birthtime;
 
                 return {
