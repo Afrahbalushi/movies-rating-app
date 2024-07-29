@@ -11,6 +11,7 @@ const { Op } = require('sequelize');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const numberToWords = require('number-to-words');
 
 
 
@@ -160,6 +161,7 @@ passport.use(new passportJWT.Strategy(jwtOptions, async (jwt_payload, done) => {
 
 app.use(passport.initialize());
 
+//1,2 
 app.post('/register', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
@@ -254,6 +256,7 @@ initializeDatabase().then(loadMovies);
 
 app.use('/movies', passport.authenticate('jwt', { session: false }));
 
+//3
 app.get('/movies', async (req, res) => {
     try {
         res.json(await Movie.findAll());
@@ -262,6 +265,7 @@ app.get('/movies', async (req, res) => {
     }
 });
 
+//4
 app.post('/movies/:id/rate', passport.authenticate('jwt', { session: false }), async (req, res) => {
     const movieId = req.params.id;
     const { score } = req.body;
@@ -292,6 +296,7 @@ app.post('/movies/:id/rate', passport.authenticate('jwt', { session: false }), a
     }
 });
 
+//4.1
 app.get('/movies/:id/ratings', async (req, res) => {
     const movieId = req.params.id;
 
@@ -346,6 +351,7 @@ const truncateDescription = (description, maxLength) => {
     return description;
 };
 
+//5
 app.get('/movies/list', async (req, res) => {
     try {
         const movies = await Movie.findAll({
@@ -383,6 +389,66 @@ app.get('/movies/list', async (req, res) => {
 
 
 
+//6
+app.get('/movies/:id/details', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    const movieId = req.params.id;
+
+    try {
+        const movie = await Movie.findByPk(movieId, {
+            include: [
+                {
+                    model: Rating,
+                    attributes: ['score']
+                }
+            ]
+        });
+
+        if (!movie) {
+            return res.status(404).json({ error: 'Movie not found' });
+        }
+
+       
+        const averageRating = await Rating.findAll({
+            where: { MovieId: movieId },
+            attributes: [[sequelize.fn('AVG', sequelize.col('score')), 'averageRating']]
+        });
+        const avgRating = averageRating[0].get('averageRating') || 0;
+
+        
+        const budgetInWords = movie.budget ? numberToWords.toWords(movie.budget) : '';
+
+       
+        let userRating = null;
+        if (req.user) {
+            const rating = await Rating.findOne({
+                where: { UserId: req.user.id, MovieId: movieId }
+            });
+            userRating = rating ? rating.score : null;
+        }
+
+        res.json({
+            id: movie.id,
+            name: movie.name,
+            description: movie.description,
+            release_date: movie.release_date,
+            main_cast: movie.main_cast,
+            director: movie.director,
+            budget: movie.budget,
+            budget_in_words: budgetInWords,
+            user_rating: userRating,
+            average_rating: avgRating
+        });
+    } catch (error) {
+        console.error('Error fetching movie details:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
+
+
+//7
 app.get('/movies/search', async (req, res) => {
     const { query } = req.query;
 
@@ -408,7 +474,7 @@ app.get('/movies/search', async (req, res) => {
     }
 });
 
-
+//8
 app.get('/movies/top-rated', passport.authenticate('jwt', { session: false }), async (req, res) => {
     try {
         const userId = req.user.id;
@@ -438,7 +504,6 @@ app.get('/movies/top-rated', passport.authenticate('jwt', { session: false }), a
 });
 
 
-
 const downloadImage = async (url, filePath) => {
     const writer = fs.createWriteStream(filePath);
     const response = await axios({
@@ -453,7 +518,7 @@ const downloadImage = async (url, filePath) => {
     });
 };
 
-
+//9
 app.post('/movies/:id/memories', passport.authenticate('jwt', { session: false }), async (req, res) => {
     const movieId = req.params.id;
     const { title, date, story, photoUrl } = req.body;
@@ -499,7 +564,7 @@ app.post('/movies/:id/memories', passport.authenticate('jwt', { session: false }
 });
 
 
-
+//10
 app.get('/memories', passport.authenticate('jwt', { session: false }), async (req, res) => {
     try {
         const userId = req.user.id;
@@ -528,6 +593,16 @@ app.get('/memories', passport.authenticate('jwt', { session: false }), async (re
 });
 
 
+
+//11
+
+
+
+//12
+
+
+
+//13
 app.put('/memories/:id', passport.authenticate('jwt', { session: false }), async (req, res) => {
     const memoryId = req.params.id;
     const { title, story } = req.body;
@@ -555,7 +630,7 @@ app.put('/memories/:id', passport.authenticate('jwt', { session: false }), async
 });
 
 
-
+//14
 app.post('/memories/:id/photos', passport.authenticate('jwt', { session: false }), upload.array('photos', 10), async (req, res) => {
     const memoryId = req.params.id;
 
@@ -618,7 +693,7 @@ app.delete('/memories/:id/photos', passport.authenticate('jwt', { session: false
 });
 
 
-
+//15
 app.delete('/memories/:id', passport.authenticate('jwt', { session: false }), async (req, res) => {
     const memoryId = req.params.id;
 
@@ -660,6 +735,7 @@ const stopWords = new Set([
     'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now'
 ]);
 
+//16
 app.get('/top-words', passport.authenticate('jwt', { session: false }), async (req, res) => {
     try {
         const memories = await Memory.findAll({ attributes: ['story'] });
@@ -685,7 +761,7 @@ app.get('/top-words', passport.authenticate('jwt', { session: false }), async (r
 });
 
 
-
+//17
 app.get('/memories/:id/urls', passport.authenticate('jwt', { session: false }), async (req, res) => {
     const memoryId = req.params.id;
 
@@ -713,6 +789,7 @@ const isUnscrambledName = (movieName, scrambled) => {
     return normalize(movieName) === normalize(scrambled);
 };
 
+//18
 app.get('/movies/unscramble', async (req, res) => {
     const { scrambled } = req.query;
 
@@ -737,7 +814,7 @@ app.get('/movies/unscramble', async (req, res) => {
 
 
 
-
+//19
 app.get('/ratings/compare', passport.authenticate('jwt', { session: false }), async (req, res) => {
     try {
         const userId = req.user.id;
