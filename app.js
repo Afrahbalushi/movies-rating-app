@@ -738,6 +738,59 @@ app.get('/movies/unscramble', async (req, res) => {
 
 
 
+app.get('/ratings/compare', passport.authenticate('jwt', { session: false }), async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const userRatings = await Rating.findAll({
+            where: { UserId: userId },
+            include: [{
+                model: Movie,
+                attributes: ['id', 'name']
+            }],
+            attributes: ['MovieId', 'score']
+        });
+        
+        const averageRatings = await Movie.findAll({
+            attributes: [
+                'id',
+                'name',
+                [sequelize.fn('AVG', sequelize.col('Ratings.score')), 'averageRating']
+            ],
+            include: [{
+                model: Rating,
+                attributes: []
+            }],
+            group: ['Movie.id', 'name']
+        });
+
+        const userRatingsMap = userRatings.reduce((acc, rating) => {
+            acc[rating.MovieId] = rating.score;
+            return acc;
+        }, {});
+        
+        const result = averageRatings.map(movie => {
+            const userRating = userRatingsMap[movie.id];
+            return {
+                id: movie.id,
+                name: movie.name,
+                userRating: userRating || null,
+                averageRating: parseFloat(movie.dataValues.averageRating || 0),
+                isUserRating: userRating ? userRating === parseFloat(movie.dataValues.averageRating) : false
+            };
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error comparing ratings:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server running on port ${port}`));
+
