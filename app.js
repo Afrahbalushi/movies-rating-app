@@ -595,6 +595,69 @@ app.get('/memories', passport.authenticate('jwt', { session: false }), async (re
 
 
 //11
+app.get('/memories/:id', async (req, res) => {
+    const memoryId = parseInt(req.params.id, 10);
+
+    try {
+        
+        const memory = await Memory.findByPk(memoryId);
+
+        if (!memory) {
+            return res.status(404).json({ error: 'Memory not found' });
+        }
+
+        
+        const photoFilenames = memory.photos ? memory.photos.split(',') : [];
+
+        
+        const photoDetails = photoFilenames.map(photoFilename => {
+            const trimmedFilename = photoFilename.trim();
+            const photoPath = path.join(uploadDir, trimmedFilename);
+
+            console.log(`Attempting to read photo file: ${photoPath}`); 
+
+            try {
+                
+                if (!fs.existsSync(photoPath)) {
+                    console.error(`File does not exist: ${photoPath}`);
+                    return null;
+                }
+
+                const stats = fs.statSync(photoPath);
+                const photoName = path.basename(trimmedFilename, path.extname(trimmedFilename));
+                const photoExtension = path.extname(trimmedFilename).substring(1).toUpperCase(); // Extension without '.'
+                const photoSize = (stats.size / 1024).toFixed(2) + 'KB'; // Size in KB
+                const photoTimeCreated = stats.birthtime;
+
+                return {
+                    id: trimmedFilename, 
+                    name: photoName,
+                    extension: photoExtension,
+                    size: photoSize,
+                    timeCreated: photoTimeCreated
+                };
+            } catch (error) {
+                console.error(`Error reading photo file: ${photoPath}`, error);
+                return null;
+            }
+        }).filter(photo => photo !== null);
+
+        
+        res.json({
+            id: memory.id,
+            movieId: memory.movieId,
+            movieName: memory.movieName, 
+            title: memory.title,
+            story: memory.story,
+            photos: photoDetails
+        });
+    } catch (error) {
+        console.error('Error fetching memory:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
 
 
 
