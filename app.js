@@ -599,25 +599,25 @@ app.get('/memories/:id', async (req, res) => {
     const memoryId = parseInt(req.params.id, 10);
 
     try {
-        // Fetch memory details
+        
         const memory = await Memory.findByPk(memoryId);
 
         if (!memory) {
             return res.status(404).json({ error: 'Memory not found' });
         }
 
-        // Handle the case where photos is a string of filenames
+       
         const photoFilenames = memory.photos ? memory.photos.split(',') : [];
 
-        // Process each photo file
+       
         const photoDetails = photoFilenames.map(photoFilename => {
             const trimmedFilename = photoFilename.trim();
             const photoPath = path.join(uploadDir, trimmedFilename);
 
-            console.log(`Attempting to read photo file: ${photoPath}`); // Log the path
+            console.log(`Attempting to read photo file: ${photoPath}`); 
 
             try {
-                // Check if the file exists before attempting to read it
+               
                 if (!fs.existsSync(photoPath)) {
                     console.error(`File does not exist: ${photoPath}`);
                     return null;
@@ -625,12 +625,12 @@ app.get('/memories/:id', async (req, res) => {
 
                 const stats = fs.statSync(photoPath);
                 const photoName = path.basename(trimmedFilename, path.extname(trimmedFilename));
-                const photoExtension = path.extname(trimmedFilename).substring(1).toUpperCase(); // Extension without '.'
-                const photoSize = (stats.size / 1024).toFixed(2) + 'KB'; // Size in KB
+                const photoExtension = path.extname(trimmedFilename).substring(1).toUpperCase(); 
+                const photoSize = (stats.size / 1024).toFixed(2) + 'KB'; 
                 const photoTimeCreated = stats.birthtime;
 
                 return {
-                    id: trimmedFilename, // Use filename or another unique identifier
+                    id: trimmedFilename, 
                     name: photoName,
                     extension: photoExtension,
                     size: photoSize,
@@ -642,11 +642,11 @@ app.get('/memories/:id', async (req, res) => {
             }
         }).filter(photo => photo !== null);
 
-        // Respond with memory details including photo information
+        
         res.json({
             id: memory.id,
             movieId: memory.movieId,
-            movieName: memory.movieName, // Adjust according to how you fetch the movie name
+            movieName: memory.movieName, 
             title: memory.title,
             story: memory.story,
             photos: photoDetails
