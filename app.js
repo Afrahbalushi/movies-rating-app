@@ -880,7 +880,7 @@ const isUnscrambledName = (movieName, scrambled) => {
 };
 
 //18
-app.get('/movies/unscramble', async (req, res) => {
+app.get('/movies/unscramble', async (req, res) => { 
     const { scrambled } = req.query;
 
     if (!scrambled) {
